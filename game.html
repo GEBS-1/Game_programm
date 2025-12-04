@@ -8,8 +8,8 @@
 </head>
 <body>
     <div class="game-container">
-        <!-- Панель игрока (слева) -->
-        <div class="player-panel">
+        <!-- Панель игрока (слева) - скрыта для ведущего -->
+        <div class="player-panel" id="playerPanel">
             <h2 id="playerNameDisplay">Загрузка...</h2>
             
             <div class="card-section">
@@ -52,7 +52,8 @@
                 <h2>📋 Текущая ситуация:</h2>
                 <div id="caseText" class="case-text">Ожидаем начала игры...</div>
                 
-                <div class="answer-section">
+                <!-- Секция ответа - скрыта для ведущего -->
+                <div class="answer-section" id="answerSection">
                     <textarea id="answerInput" placeholder="Ваше решение..."></textarea>
                     
                     <div class="action-buttons">

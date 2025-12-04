@@ -394,6 +394,50 @@ tr:hover {
     line-height: 1.6;
 }
 
+.score-buttons {
+    display: flex;
+    gap: 10px;
+    margin-top: 10px;
+    flex-wrap: wrap;
+}
+
+.score-btn {
+    padding: 8px 16px;
+    border: 2px solid #667eea;
+    background: white;
+    color: #667eea;
+    border-radius: 8px;
+    cursor: pointer;
+    font-size: 14px;
+    font-weight: bold;
+    transition: all 0.3s;
+}
+
+.score-btn:hover {
+    background: #667eea;
+    color: white;
+    transform: translateY(-2px);
+    box-shadow: 0 4px 8px rgba(102, 126, 234, 0.3);
+}
+
+.score-btn.selected-score {
+    background: #667eea;
+    color: white;
+    box-shadow: 0 2px 4px rgba(102, 126, 234, 0.5);
+}
+
+.card.disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+    background: #e0e0e0;
+    border-color: #ccc;
+}
+
+.card.disabled:hover {
+    transform: none;
+    box-shadow: none;
+}
+
 /* Адаптивность */
 @media (max-width: 768px) {
     .game-container {
