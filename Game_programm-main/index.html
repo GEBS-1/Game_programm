@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ГосСимулятор: Карьерный старт</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="container">
+        <h1>🎮 ГосСимулятор: Карьерный старт</h1>
+        
+        <div class="server-info" style="background: #d4edda; border: 2px solid #28a745; color: #155724; padding: 15px; border-radius: 10px; margin: 20px auto; max-width: 800px; text-align: center;">
+            <strong>🎮 Локальный сервер</strong><br>
+            Игра работает через локальный сервер на вашем ноутбуке.<br>
+            Убедитесь, что сервер запущен (команда: npm start)
+        </div>
+        
+        <div class="role-selection">
+            <!-- Для ведущего -->
+            <div class="role-card">
+                <h3>👑 Ведущий</h3>
+                <button onclick="createGame()">Создать новую игру</button>
+                <div id="gameCodeSection" style="display:none;">
+                    <p>Код игры: <strong id="gameCode"></strong></p>
+                    <p class="code-hint">Поделитесь этим кодом с игроками</p>
+                    <button onclick="startGame()">Начать игру</button>
+                </div>
+            </div>
+            
+            <!-- Для игрока -->
+            <div class="role-card">
+                <h3>👤 Игрок</h3>
+                <input type="text" id="playerName" placeholder="Ваше имя">
+                <input type="text" id="inputGameCode" placeholder="Код игры" maxlength="6">
+                <button onclick="joinGame()">Присоединиться</button>
+                <div id="joinStatus"></div>
+            </div>
+        </div>
+        
+        <div class="instructions">
+            <h3>📖 Как играть:</h3>
+            <ol>
+                <li>Ведущий создаёт игру и получает код</li>
+                <li>Игроки вводят код и свои имена</li>
+                <li>Система раздаёт карточки (министерство, компетенции, ресурсы)</li>
+                <li>Решаем стресс-ситуации, зарабатываем баллы</li>
+                <li>Побеждает тот, кто набрал больше всего баллов!</li>
+            </ol>
+        </div>
+    </div>
+    
+    <script type="module" src="script.js"></script>
+</body>
+</html>
+

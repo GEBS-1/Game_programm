@@ -1,0 +1,33 @@
+# Firebase (для локальной разработки можно скрыть, но для GitHub Pages нужен)
+# firebase-config.js
+
+# Node.js
+node_modules/
+package-lock.json
+
+# Игры (данные) - не нужны на GitHub Pages
+games/
+
+# Локальные файлы сервера
+server.js
+script-local.js
+start-server.bat
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+npm-debug.log*
+
+# Temporary files
+*.tmp
+*.temp

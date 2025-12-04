@@ -1,0 +1,102 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Игровая комната - ГосСимулятор</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="game-container">
+        <!-- Панель игрока (слева) -->
+        <div class="player-panel">
+            <h2 id="playerNameDisplay">Загрузка...</h2>
+            
+            <div class="card-section">
+                <h3>🏛️ Министерство:</h3>
+                <div class="card ministry-card" id="ministryCard">Загрузка...</div>
+            </div>
+            
+            <div class="card-section">
+                <h3>💪 Компетенции:</h3>
+                <div class="cards-container">
+                    <div class="card competence" id="competence0" onclick="useCompetence(0)">
+                        <div class="card-title">Загрузка...</div>
+                    </div>
+                    <div class="card competence" id="competence1" onclick="useCompetence(1)">
+                        <div class="card-title">Загрузка...</div>
+                    </div>
+                    <div class="card competence" id="competence2" onclick="useCompetence(2)">
+                        <div class="card-title">Загрузка...</div>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="card-section">
+                <h3>🛠️ Ресурсы:</h3>
+                <div class="cards-container">
+                    <div class="card resource" id="resource0" onclick="useResource(0)">
+                        <div class="card-title">Загрузка...</div>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="score-section">
+                <h3>🏆 Баллы: <span id="playerScore">0</span></h3>
+            </div>
+        </div>
+        
+        <!-- Игровое поле (центр) -->
+        <div class="game-field">
+            <div class="current-case">
+                <h2>📋 Текущая ситуация:</h2>
+                <div id="caseText" class="case-text">Ожидаем начала игры...</div>
+                
+                <div class="answer-section">
+                    <textarea id="answerInput" placeholder="Ваше решение..."></textarea>
+                    
+                    <div class="action-buttons">
+                        <button onclick="submitAnswer()" id="submitBtn">Отправить ответ</button>
+                        <button onclick="useSelectedCompetence()" id="compBtn" disabled>
+                            Использовать компетенцию
+                        </button>
+                        <button onclick="useSelectedResource()" id="resBtn" disabled>
+                            Использовать ресурс
+                        </button>
+                    </div>
+                    
+                    <div id="selectedCards" class="selected-cards">
+                        <!-- Здесь отображаются выбранные карты -->
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Таблица лидеров (справа) -->
+            <div class="leaderboard">
+                <h2>🏆 Таблица лидеров</h2>
+                <table id="leaderboardTable">
+                    <thead>
+                        <tr><th>Игрок</th><th>Баллы</th></tr>
+                    </thead>
+                    <tbody></tbody>
+                </table>
+            </div>
+        </div>
+        
+        <!-- Консоль ведущего (только для ведущего) -->
+        <div class="host-console" id="hostConsole" style="display:none;">
+            <h3>👑 Панель ведущего</h3>
+            <div class="host-buttons">
+                <button onclick="nextCase()" id="nextCaseBtn">Следующий кейс</button>
+                <button onclick="endGame()">Завершить игру</button>
+            </div>
+            
+            <h4>Ответы игроков:</h4>
+            <div id="playerAnswers" class="player-answers"></div>
+        </div>
+    </div>
+    
+    <script type="module" src="script.js"></script>
+</body>
+</html>
+
