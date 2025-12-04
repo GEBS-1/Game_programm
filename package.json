@@ -1,0 +1,18 @@
+{
+  "name": "gossimulator",
+  "version": "1.0.0",
+  "description": "ГосСимулятор: Карьерный старт - локальный сервер",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node server.js"
+  },
+  "keywords": ["game", "websocket", "local"],
+  "author": "",
+  "license": "MIT",
+  "dependencies": {
+    "ws": "^8.14.2",
+    "express": "^4.18.2"
+  }
+}
+
