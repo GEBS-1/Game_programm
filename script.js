@@ -18,6 +18,7 @@ let playerCards = null;
 let gameValueUnsubscribe = null;
 let playerValueUnsubscribe = null;
 let isGamePageInitialized = false;
+let isRegisteringPlayer = false; // Флаг для защиты от множественной регистрации
 
 // Данные игры (загружаются из JSON файлов)
 let ministries = [];
@@ -173,11 +174,13 @@ async function joinGame() {
                     return;
                 }
                 
-                // Регистрируем игрока
-                currentGameCode = inputCode;
-                playerId = generatePlayerId();
-                
-                registerPlayer(playerName, inputCode);
+                // Регистрируем игрока (только если еще не регистрируемся)
+                if (!isRegisteringPlayer) {
+                    currentGameCode = inputCode;
+                    playerId = generatePlayerId();
+                    
+                    registerPlayer(playerName, inputCode);
+                }
             }, { once: true });
         } else {
             // Демо-режим: просто регистрируем локально
@@ -199,18 +202,27 @@ async function joinGame() {
 
 // Регистрация игрока
 async function registerPlayer(playerName, gameCode) {
+    // Защита от множественных вызовов
+    if (isRegisteringPlayer) {
+        console.log("Регистрация игрока уже выполняется, пропускаем повторный вызов");
+        return;
+    }
+    
+    isRegisteringPlayer = true;
+    
     try {
         // Загружаем данные перед регистрацией
         await loadGameData();
         
-        // Проверяем, не зарегистрирован ли уже игрок с таким ID
+        // Проверяем, не зарегистрирован ли уже игрок с таким ID или именем
         if (firebaseReady && database) {
+            // Проверяем по ID
             const playerRef = ref(database, `games/${gameCode}/players/${playerId}`);
             const snapshot = await new Promise((resolve) => {
                 onValue(playerRef, resolve, { once: true });
             });
             if (snapshot.exists()) {
-                console.log("Игрок уже зарегистрирован:", playerId);
+                console.log("Игрок уже зарегистрирован с таким ID:", playerId);
                 // Обновляем localStorage и переходим в игру
                 localStorage.setItem('gameData', JSON.stringify({
                     gameCode: gameCode,
@@ -222,6 +234,34 @@ async function registerPlayer(playerName, gameCode) {
                     window.location.href = "game.html";
                 }, 500);
                 return;
+            }
+            
+            // Проверяем, нет ли уже игрока с таким именем в этой игре
+            const playersRef = ref(database, `games/${gameCode}/players`);
+            const playersSnapshot = await new Promise((resolve) => {
+                onValue(playersRef, resolve, { once: true });
+            });
+            if (playersSnapshot.exists()) {
+                const players = playersSnapshot.val();
+                const existingPlayer = Object.values(players).find(p => p.name === playerName);
+                if (existingPlayer) {
+                    console.log("Игрок с таким именем уже зарегистрирован:", playerName);
+                    // Находим ID существующего игрока
+                    const existingPlayerId = Object.keys(players).find(id => players[id].name === playerName);
+                    if (existingPlayerId) {
+                        playerId = existingPlayerId;
+                        localStorage.setItem('gameData', JSON.stringify({
+                            gameCode: gameCode,
+                            playerId: playerId,
+                            playerName: playerName,
+                            isHost: false
+                        }));
+                        setTimeout(() => {
+                            window.location.href = "game.html";
+                        }, 500);
+                        return;
+                    }
+                }
             }
         }
         
@@ -272,32 +312,68 @@ async function registerPlayer(playerName, gameCode) {
     } catch (error) {
         console.error("Ошибка регистрации игрока:", error);
         alert("Ошибка регистрации игрока: " + error.message);
+    } finally {
+        // Сбрасываем флаг через небольшую задержку
+        setTimeout(() => {
+            isRegisteringPlayer = false;
+        }, 2000);
     }
 }
 
 // Загрузка данных игры
 async function loadGameData() {
     try {
-        const responses = await Promise.all([
-            fetch('data/ministries.json'),
-            fetch('data/competences.json'),
-            fetch('data/resources.json'),
-            fetch('data/stress-cases.json'),
-            fetch('data/regular-cases.json')
-        ]);
+        // Пробуем разные пути для совместимости с разными окружениями
+        const basePaths = [
+            './data/',
+            'data/',
+            '/data/',
+            '../data/'
+        ];
         
-        const data = await Promise.all(responses.map(r => r.json()));
+        let loaded = false;
+        let lastError = null;
         
-        ministries = data[0];
-        competences = data[1];
-        resources = data[2];
-        stressCases = data[3];
-        regularCases = data[4];
+        for (const basePath of basePaths) {
+            try {
+                const responses = await Promise.all([
+                    fetch(`${basePath}ministries.json`),
+                    fetch(`${basePath}competences.json`),
+                    fetch(`${basePath}resources.json`),
+                    fetch(`${basePath}stress-cases.json`),
+                    fetch(`${basePath}regular-cases.json`)
+                ]);
+                
+                // Проверяем, что все запросы успешны
+                const failed = responses.find(r => !r.ok);
+                if (failed) {
+                    throw new Error(`Failed to load: ${failed.url}`);
+                }
+                
+                const data = await Promise.all(responses.map(r => r.json()));
+                
+                ministries = data[0];
+                competences = data[1];
+                resources = data[2];
+                stressCases = data[3];
+                regularCases = data[4];
+                
+                console.log("Данные игры загружены из:", basePath);
+                loaded = true;
+                break;
+            } catch (error) {
+                lastError = error;
+                console.warn(`Не удалось загрузить из ${basePath}:`, error);
+            }
+        }
         
-        console.log("Данные игры загружены");
+        if (!loaded) {
+            throw lastError || new Error("Не удалось загрузить данные игры");
+        }
     } catch (error) {
         console.error("Ошибка загрузки данных:", error);
-        alert("Ошибка загрузки данных игры. Проверьте наличие файлов в папке data/");
+        alert("Ошибка загрузки данных игры. Проверьте наличие файлов в папке data/ и подключение к интернету.\n\nОшибка: " + error.message);
+        throw error;
     }
 }
 
@@ -684,8 +760,13 @@ async function initializeGamePage() {
     playerId = gameData.playerId;
     isHost = gameData.isHost || false;
     
-    // Загружаем данные игры
-    await loadGameData();
+    // Загружаем данные игры с обработкой ошибок
+    try {
+        await loadGameData();
+    } catch (error) {
+        console.error("Критическая ошибка загрузки данных:", error);
+        // Не прерываем выполнение, но показываем предупреждение
+    }
     
     // Отписываемся от предыдущих подписок, если они есть
     if (gameValueUnsubscribe) {
