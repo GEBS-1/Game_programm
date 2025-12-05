@@ -1118,6 +1118,20 @@ async function initializeGamePage() {
 }
 
 function updateGameUI(game) {
+    // Обновляем тип ситуации в заголовке
+    const caseTypeLabel = document.getElementById('caseTypeLabel');
+    if (caseTypeLabel) {
+        if (game.currentCase) {
+            if (game.isStressCase) {
+                caseTypeLabel.textContent = 'Стресс-ситуация';
+            } else {
+                caseTypeLabel.textContent = 'Кейс-ситуация';
+            }
+        } else {
+            caseTypeLabel.textContent = 'Текущая ситуация';
+        }
+    }
+    
     // Показываем текущий кейс
     if (game.currentCase) {
         const caseText = document.getElementById('caseText');
