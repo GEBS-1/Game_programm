@@ -52,6 +52,19 @@
                 <h2>📋 Текущая ситуация:</h2>
                 <div id="caseText" class="case-text">Ожидаем начала игры...</div>
                 
+                <!-- Таймер для стресс-ситуаций (виден всем) -->
+                <div id="timerContainer" class="timer-container" style="display:none;">
+                    <div class="timer-display">
+                        <span id="timerText">⏱️ Время: <span id="timerSeconds">0</span> сек</span>
+                    </div>
+                </div>
+                
+                <!-- Предполагаемый ответ (только для ведущего) -->
+                <div id="solutionContainer" class="solution-container" style="display:none;">
+                    <h3>💡 Предполагаемое решение:</h3>
+                    <div id="solutionText" class="solution-text"></div>
+                </div>
+                
                 <!-- Секция ответа - скрыта для ведущего -->
                 <div class="answer-section" id="answerSection">
                     <textarea id="answerInput" placeholder="Ваше решение..."></textarea>
@@ -92,12 +105,23 @@
                 <button onclick="endGame()">Завершить игру</button>
             </div>
             
+            <!-- Управление таймером для стресс-ситуаций -->
+            <div id="timerControls" class="timer-controls" style="display:none;">
+                <h4>⏱️ Управление таймером:</h4>
+                <div class="timer-buttons">
+                    <button onclick="startTimer(60)">1 минута</button>
+                    <button onclick="startTimer(120)">2 минуты</button>
+                    <button onclick="startTimer(180)">3 минуты</button>
+                    <button onclick="startTimer(300)">5 минут</button>
+                </div>
+            </div>
+            
             <h4>Ответы игроков:</h4>
             <div id="playerAnswers" class="player-answers"></div>
         </div>
     </div>
     
-    <script type="module" src="script.js?v=2.1"></script>
+    <script type="module" src="script.js?v=2.2"></script>
 </body>
 </html>
 

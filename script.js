@@ -640,20 +640,33 @@ async function nextCase() {
     try {
         const gameRef = ref(database, `games/${currentGameCode}`);
         
-        // Выбираем случайный кейс (чередуем стрессовые и обычные)
-        const allCases = [...stressCases, ...regularCases];
-        const randomCase = getRandomItem(allCases);
-        
         // Получаем текущий раунд
         const snapshot = await new Promise((resolve) => {
             onValue(gameRef, resolve, { once: true });
         });
         const currentRound = snapshot.val()?.currentRound || 0;
+        const newRound = currentRound + 1;
+        
+        // Определяем тип кейса: на каждом 3-м раунде (3, 6, 9...) - стресс-ситуация
+        let selectedCase;
+        let isStressCase = false;
+        
+        if (newRound % 3 === 0) {
+            // Стресс-ситуация на каждом 3-м раунде
+            selectedCase = getRandomItem(stressCases);
+            isStressCase = true;
+        } else {
+            // Обычный кейс для остальных раундов
+            selectedCase = getRandomItem(regularCases);
+        }
         
         await update(gameRef, {
-            currentCase: randomCase,
-            currentRound: currentRound + 1,
-            answers: {} // Очищаем ответы
+            currentCase: selectedCase,
+            currentRound: newRound,
+            answers: {}, // Очищаем ответы
+            isStressCase: isStressCase,
+            timerActive: false,
+            timerSeconds: 0
         });
         
         // Сбрасываем ответы всех игроков
@@ -686,13 +699,71 @@ async function nextCase() {
             }
         }, { once: true });
         
-        console.log("Следующий кейс загружен");
+        console.log("Следующий кейс загружен. Раунд:", newRound, "Тип:", isStressCase ? "стресс-ситуация" : "обычный");
         
     } catch (error) {
         console.error("Ошибка загрузки кейса:", error);
         alert("Ошибка загрузки следующего кейса.");
     }
 }
+
+// Глобальная переменная для хранения интервала таймера
+let timerIntervalId = null;
+
+// Функция запуска таймера для стресс-ситуации (для ведущего)
+async function startTimer(seconds) {
+    if (!isHost || !currentGameCode) return;
+    
+    // Останавливаем предыдущий таймер, если он был запущен
+    if (timerIntervalId) {
+        clearInterval(timerIntervalId);
+        timerIntervalId = null;
+    }
+    
+    try {
+        const gameRef = ref(database, `games/${currentGameCode}`);
+        
+        await update(gameRef, {
+            timerActive: true,
+            timerSeconds: seconds,
+            timerStartTime: Date.now()
+        });
+        
+        console.log(`Таймер запущен: ${seconds} секунд`);
+        
+        // Запускаем обратный отсчет
+        let remaining = seconds;
+        timerIntervalId = setInterval(async () => {
+            remaining--;
+            
+            if (remaining <= 0) {
+                if (timerIntervalId) {
+                    clearInterval(timerIntervalId);
+                    timerIntervalId = null;
+                }
+                await update(gameRef, {
+                    timerActive: false,
+                    timerSeconds: 0
+                });
+                alert("Время вышло!");
+            } else {
+                await update(gameRef, {
+                    timerSeconds: remaining
+                });
+            }
+        }, 1000);
+        
+    } catch (error) {
+        console.error("Ошибка запуска таймера:", error);
+        alert("Ошибка запуска таймера.");
+        if (timerIntervalId) {
+            clearInterval(timerIntervalId);
+            timerIntervalId = null;
+        }
+    }
+}
+
+window.startTimer = startTimer;
 
 // Функция завершения игры
 async function endGame() {
@@ -818,6 +889,10 @@ function cleanupSubscriptions() {
         playerValueUnsubscribe();
         playerValueUnsubscribe = null;
     }
+    if (timerIntervalId) {
+        clearInterval(timerIntervalId);
+        timerIntervalId = null;
+    }
     isGamePageInitialized = false;
 }
 
@@ -927,6 +1002,26 @@ function updateGameUI(game) {
             caseText.textContent = game.currentCase.text || game.currentCase.description || "Кейс загружается...";
         }
         
+        // Показываем предполагаемое решение для ведущего
+        if (isHost) {
+            const solutionContainer = document.getElementById('solutionContainer');
+            const solutionText = document.getElementById('solutionText');
+            if (solutionContainer && solutionText && game.currentCase.solution) {
+                solutionText.textContent = game.currentCase.solution;
+                solutionContainer.style.display = 'block';
+            } else if (solutionContainer) {
+                solutionContainer.style.display = 'none';
+            }
+        }
+        
+        // Показываем/скрываем управление таймером для ведущего (только для стресс-ситуаций)
+        if (isHost) {
+            const timerControls = document.getElementById('timerControls');
+            if (timerControls) {
+                timerControls.style.display = game.isStressCase ? 'block' : 'none';
+            }
+        }
+        
         // Сбрасываем форму ответа для нового кейса (только для игроков, не для ведущего)
         if (!isHost) {
             const answerInput = document.getElementById('answerInput');
@@ -943,6 +1038,30 @@ function updateGameUI(game) {
             updateSelectedCards();
             if (document.getElementById('compBtn')) document.getElementById('compBtn').disabled = true;
             if (document.getElementById('resBtn')) document.getElementById('resBtn').disabled = true;
+        }
+    }
+    
+    // Обновляем таймер (виден всем)
+    const timerContainer = document.getElementById('timerContainer');
+    const timerSeconds = document.getElementById('timerSeconds');
+    if (timerContainer && timerSeconds) {
+        if (game.timerActive && game.timerSeconds > 0) {
+            timerContainer.style.display = 'block';
+            timerSeconds.textContent = game.timerSeconds;
+            
+            // Добавляем визуальное предупреждение при малом времени
+            if (game.timerSeconds <= 10) {
+                timerContainer.style.background = '#ff6b6b';
+                timerContainer.style.color = 'white';
+            } else if (game.timerSeconds <= 30) {
+                timerContainer.style.background = '#ffd93d';
+                timerContainer.style.color = '#333';
+            } else {
+                timerContainer.style.background = '#667eea';
+                timerContainer.style.color = 'white';
+            }
+        } else {
+            timerContainer.style.display = 'none';
         }
     }
     
