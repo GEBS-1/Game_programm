@@ -328,12 +328,25 @@ async function registerPlayer(playerName, gameCode) {
         }
         
         // Генерируем карточки для игрока
+        // Получаем доступные компетенции
+        const positiveCompetences = competences.filter(c => c.type === 'positive');
+        const negativeCompetences = competences.filter(c => c.type === 'negative');
+        
+        // Выбираем 2 положительные и 1 отрицательную компетенцию
+        const selectedPositive = [];
+        const availablePositive = [...positiveCompetences];
+        for (let i = 0; i < 2 && availablePositive.length > 0; i++) {
+            const randomIndex = Math.floor(Math.random() * availablePositive.length);
+            selectedPositive.push(availablePositive[randomIndex]);
+            availablePositive.splice(randomIndex, 1);
+        }
+        
         const playerCardsData = {
             name: playerName,
             ministry: getRandomItem(ministries),
             competences: [
-                getRandomItem(competences.filter(c => c.type === 'positive')),
-                getRandomItem(competences.filter(c => c.type === 'negative'))
+                ...selectedPositive,
+                getRandomItem(negativeCompetences)
             ],
             resources: [getRandomItem(resources)],
             score: 0,
@@ -494,7 +507,8 @@ function useCompetence(index) {
     
     // Проверяем, не использована ли уже компетенция в текущем раунде
     if (playerCards.usedCompetence && playerCards.usedCompetence.id === competence.id) {
-        alert("Эта компетенция уже использована в этом раунде!");
+        // Закомментировано по просьбе пользователя - слишком много всплывающих окон
+        // alert("Эта компетенция уже использована в этом раунде!");
         return;
     }
     
@@ -509,7 +523,8 @@ function useCompetence(index) {
         if (compUsage && compUsage.lastUsedRound !== undefined) {
             const roundsSinceUse = currentRound - compUsage.lastUsedRound;
             if (roundsSinceUse < 3) {
-                alert(`Эта компетенция была использована ${roundsSinceUse} ${roundsSinceUse === 1 ? 'круг' : 'круга'} назад. Можно использовать раз в 3 круга. Доступна через ${3 - roundsSinceUse} ${3 - roundsSinceUse === 1 ? 'круг' : 'круга'}.`);
+                // Закомментировано по просьбе пользователя - слишком много всплывающих окон
+                // alert(`Эта компетенция была использована ${roundsSinceUse} ${roundsSinceUse === 1 ? 'круг' : 'круга'} назад. Можно использовать раз в 3 круга. Доступна через ${3 - roundsSinceUse} ${3 - roundsSinceUse === 1 ? 'круг' : 'круга'}.`);
                 return;
             }
         }
@@ -666,8 +681,15 @@ async function nextCase() {
             answers: {}, // Очищаем ответы
             isStressCase: isStressCase,
             timerActive: false,
-            timerSeconds: 0
+            timerSeconds: 0,
+            timerPaused: false
         });
+        
+        // Останавливаем таймер, если он был запущен
+        if (timerIntervalId) {
+            clearInterval(timerIntervalId);
+            timerIntervalId = null;
+        }
         
         // Сбрасываем ответы всех игроков
         const playersRef = ref(database, `games/${currentGameCode}/players`);
@@ -734,6 +756,14 @@ async function startTimer(seconds) {
         // Запускаем обратный отсчет
         let remaining = seconds;
         timerIntervalId = setInterval(async () => {
+            // Проверяем, не остановлен ли таймер
+            const checkSnapshot = await new Promise((resolve) => {
+                onValue(gameRef, resolve, { once: true });
+            });
+            if (checkSnapshot.exists() && checkSnapshot.val().timerPaused) {
+                return; // Таймер остановлен, не обновляем
+            }
+            
             remaining--;
             
             if (remaining <= 0) {
@@ -743,7 +773,8 @@ async function startTimer(seconds) {
                 }
                 await update(gameRef, {
                     timerActive: false,
-                    timerSeconds: 0
+                    timerSeconds: 0,
+                    timerPaused: false
                 });
                 alert("Время вышло!");
             } else {
@@ -765,6 +796,85 @@ async function startTimer(seconds) {
 
 window.startTimer = startTimer;
 
+// Функция остановки/продолжения таймера
+async function toggleTimer() {
+    if (!isHost || !currentGameCode) return;
+    
+    try {
+        const gameRef = ref(database, `games/${currentGameCode}`);
+        const gameSnapshot = await new Promise((resolve) => {
+            onValue(gameRef, resolve, { once: true });
+        });
+        
+        if (!gameSnapshot.exists()) return;
+        
+        const game = gameSnapshot.val();
+        const isPaused = game.timerPaused || false;
+        
+        if (isPaused) {
+            // Продолжаем таймер
+            const remainingSeconds = game.timerSeconds || 0;
+            if (remainingSeconds > 0 && game.timerActive) {
+                await update(gameRef, {
+                    timerPaused: false,
+                    timerStartTime: Date.now()
+                });
+                
+                // Перезапускаем интервал
+                if (timerIntervalId) {
+                    clearInterval(timerIntervalId);
+                    timerIntervalId = null;
+                }
+                
+                let remaining = remainingSeconds;
+                timerIntervalId = setInterval(async () => {
+                    // Проверяем, не остановлен ли таймер
+                    const checkSnapshot = await new Promise((resolve) => {
+                        onValue(gameRef, resolve, { once: true });
+                    });
+                    if (checkSnapshot.exists() && checkSnapshot.val().timerPaused) {
+                        return; // Таймер остановлен, не обновляем
+                    }
+                    
+                    remaining--;
+                    
+                    if (remaining <= 0) {
+                        if (timerIntervalId) {
+                            clearInterval(timerIntervalId);
+                            timerIntervalId = null;
+                        }
+                        await update(gameRef, {
+                            timerActive: false,
+                            timerSeconds: 0,
+                            timerPaused: false
+                        });
+                        alert("Время вышло!");
+                    } else {
+                        await update(gameRef, {
+                            timerSeconds: remaining
+                        });
+                    }
+                }, 1000);
+            }
+        } else {
+            // Останавливаем таймер
+            if (timerIntervalId) {
+                clearInterval(timerIntervalId);
+                timerIntervalId = null;
+            }
+            
+            await update(gameRef, {
+                timerPaused: true
+            });
+        }
+    } catch (error) {
+        console.error("Ошибка переключения таймера:", error);
+        alert("Ошибка переключения таймера.");
+    }
+}
+
+window.toggleTimer = toggleTimer;
+
 // Функция завершения игры
 async function endGame() {
     if (!currentGameCode || !isHost) return;
@@ -784,7 +894,7 @@ async function endGame() {
         });
         
         const players = playersSnapshot.val() || {};
-        showFinalLeaderboard(players);
+        showFinalLeaderboard(players, true); // Передаем true для показа кнопки возврата
         
     } catch (error) {
         console.error("Ошибка завершения игры:", error);
@@ -793,7 +903,7 @@ async function endGame() {
 }
 
 // Функция показа финальной таблицы лидеров
-function showFinalLeaderboard(players) {
+function showFinalLeaderboard(players, showReturnButton = false) {
     // Создаем модальное окно с финальной таблицей
     const modal = document.createElement('div');
     modal.className = 'final-leaderboard-modal';
@@ -841,12 +951,25 @@ function showFinalLeaderboard(players) {
     html += `
                 </tbody>
             </table>
+    `;
+    
+    if (showReturnButton) {
+        html += `
+            <button onclick="window.location.href='index.html'" 
+                    style="width: 100%; padding: 12px; background: #667eea; color: white; border: none; border-radius: 8px; font-size: 16px; cursor: pointer; margin-bottom: 10px;">
+                Завершить
+            </button>
+        `;
+    } else {
+        html += `
             <button onclick="this.closest('.final-leaderboard-modal').remove()" 
                     style="width: 100%; padding: 12px; background: #667eea; color: white; border: none; border-radius: 8px; font-size: 16px; cursor: pointer;">
                 Закрыть
             </button>
-        </div>
-    `;
+        `;
+    }
+    
+    html += `</div>`;
     
     modal.innerHTML = html;
     document.body.appendChild(modal);
@@ -1044,10 +1167,18 @@ function updateGameUI(game) {
     // Обновляем таймер (виден всем)
     const timerContainer = document.getElementById('timerContainer');
     const timerSeconds = document.getElementById('timerSeconds');
+    const toggleTimerBtn = document.getElementById('toggleTimerBtn');
+    
     if (timerContainer && timerSeconds) {
         if (game.timerActive && game.timerSeconds > 0) {
             timerContainer.style.display = 'block';
             timerSeconds.textContent = game.timerSeconds;
+            
+            // Обновляем текст кнопки остановки/продолжения
+            if (toggleTimerBtn) {
+                toggleTimerBtn.textContent = game.timerPaused ? 'Продолжить' : 'Остановить';
+                toggleTimerBtn.style.background = game.timerPaused ? '#43e97b' : '#f5576c';
+            }
             
             // Добавляем визуальное предупреждение при малом времени
             if (game.timerSeconds <= 10) {
@@ -1060,8 +1191,19 @@ function updateGameUI(game) {
                 timerContainer.style.background = '#667eea';
                 timerContainer.style.color = 'white';
             }
+            
+            // Показываем индикатор паузы
+            if (game.timerPaused) {
+                timerContainer.style.opacity = '0.6';
+            } else {
+                timerContainer.style.opacity = '1';
+            }
         } else {
             timerContainer.style.display = 'none';
+            if (toggleTimerBtn) {
+                toggleTimerBtn.textContent = 'Остановить';
+                toggleTimerBtn.style.background = '#f5576c';
+            }
         }
     }
     
@@ -1123,11 +1265,21 @@ async function updatePlayerCards() {
     
     const usedCompetences = playerCards.usedCompetences || {};
     
-    // Обновляем компетенции
+    // Обновляем компетенции - убеждаемся, что все 3 карточки обновляются
     if (playerCards.competences) {
+        // Сначала скрываем все карточки
+        for (let i = 0; i < 3; i++) {
+            const compCard = document.getElementById(`competence${i}`);
+            if (compCard) {
+                compCard.style.display = 'none';
+            }
+        }
+        
+        // Затем показываем и обновляем только существующие компетенции
         playerCards.competences.forEach((comp, index) => {
             const compCard = document.getElementById(`competence${index}`);
             if (compCard && comp) {
+                compCard.style.display = 'block';
                 const typeIcon = comp.type === 'positive' ? '✅' : '⚠️';
                 const compUsage = usedCompetences[comp.id];
                 
@@ -1239,18 +1391,24 @@ function updatePlayerAnswers(answers, players) {
             html += `<p><strong>Ресурс:</strong> ${answer.resource.name}</p>`;
         }
         
-        // Показываем текущую оценку за раунд, если есть
+        // Если оценка уже выставлена, показываем только кнопку "Изменить", иначе показываем кнопки оценки
         if (currentRoundScore !== null) {
-            html += `<p><strong>Оценка за раунд:</strong> ${currentRoundScore > 0 ? '+' : ''}${currentRoundScore} баллов</p>`;
+            html += `<button onclick="showScoreButtons('${playerId}')" class="change-score-btn">Изменить</button>`;
+            html += `<div id="scoreButtons_${playerId}" class="score-buttons" style="display:none;">`;
+            html += `<button onclick="awardPoints('${playerId}', 0)" class="score-btn ${currentRoundScore === 0 ? 'selected-score' : ''}">0</button> `;
+            html += `<button onclick="awardPoints('${playerId}', 1)" class="score-btn ${currentRoundScore === 1 ? 'selected-score' : ''}">+1</button> `;
+            html += `<button onclick="awardPoints('${playerId}', 2)" class="score-btn ${currentRoundScore === 2 ? 'selected-score' : ''}">+2</button> `;
+            html += `<button onclick="awardPoints('${playerId}', 3)" class="score-btn ${currentRoundScore === 3 ? 'selected-score' : ''}">+3</button>`;
+            html += `</div>`;
+        } else {
+            // Кнопки для оценки: 0, +1, +2, +3
+            html += `<div class="score-buttons">`;
+            html += `<button onclick="awardPoints('${playerId}', 0)" class="score-btn">0</button> `;
+            html += `<button onclick="awardPoints('${playerId}', 1)" class="score-btn">+1</button> `;
+            html += `<button onclick="awardPoints('${playerId}', 2)" class="score-btn">+2</button> `;
+            html += `<button onclick="awardPoints('${playerId}', 3)" class="score-btn">+3</button>`;
+            html += `</div>`;
         }
-        
-        // Кнопки для оценки: 0, +1, +2, +3
-        html += `<div class="score-buttons">`;
-        html += `<button onclick="awardPoints('${playerId}', 0)" class="score-btn ${currentRoundScore === 0 ? 'selected-score' : ''}">0</button> `;
-        html += `<button onclick="awardPoints('${playerId}', 1)" class="score-btn ${currentRoundScore === 1 ? 'selected-score' : ''}">+1</button> `;
-        html += `<button onclick="awardPoints('${playerId}', 2)" class="score-btn ${currentRoundScore === 2 ? 'selected-score' : ''}">+2</button> `;
-        html += `<button onclick="awardPoints('${playerId}', 3)" class="score-btn ${currentRoundScore === 3 ? 'selected-score' : ''}">+3</button>`;
-        html += `</div>`;
         
         answerDiv.innerHTML = html;
         container.appendChild(answerDiv);
@@ -1304,6 +1462,16 @@ async function awardPoints(targetPlayerId, points) {
         
         console.log(`Установлена оценка ${points} баллов игроку ${targetPlayerId} за раунд ${currentRound}`);
         
+        // Обновляем интерфейс ответов игроков, чтобы показать кнопку "Изменить"
+        const gameRefForUpdate = ref(database, `games/${currentGameCode}`);
+        const gameSnapshotForUpdate = await new Promise((resolve) => {
+            onValue(gameRefForUpdate, resolve, { once: true });
+        });
+        if (gameSnapshotForUpdate.exists()) {
+            const gameData = gameSnapshotForUpdate.val();
+            updatePlayerAnswers(gameData.answers, gameData.players);
+        }
+        
     } catch (error) {
         console.error("Ошибка начисления баллов:", error);
         alert("Ошибка начисления баллов.");
@@ -1311,5 +1479,15 @@ async function awardPoints(targetPlayerId, points) {
 }
 
 window.awardPoints = awardPoints;
+
+// Функция показа кнопок оценки для изменения
+function showScoreButtons(playerId) {
+    const scoreButtons = document.getElementById(`scoreButtons_${playerId}`);
+    if (scoreButtons) {
+        scoreButtons.style.display = scoreButtons.style.display === 'none' ? 'flex' : 'none';
+    }
+}
+
+window.showScoreButtons = showScoreButtons;
 
 

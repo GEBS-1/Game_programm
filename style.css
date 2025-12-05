@@ -510,6 +510,24 @@ tr:hover {
     box-shadow: 0 4px 8px rgba(102, 126, 234, 0.3);
 }
 
+.change-score-btn {
+    padding: 8px 16px;
+    background: #667eea;
+    color: white;
+    border: none;
+    border-radius: 8px;
+    cursor: pointer;
+    font-size: 14px;
+    margin-top: 10px;
+    transition: all 0.3s;
+}
+
+.change-score-btn:hover {
+    background: #5568d3;
+    transform: translateY(-2px);
+    box-shadow: 0 4px 8px rgba(102, 126, 234, 0.3);
+}
+
 /* Адаптивность */
 @media (max-width: 768px) {
     .game-container {
